@@ -5,7 +5,7 @@ from pyspark.sql import SparkSession
 spark = SparkSession.builder \
     .appName("Load the dataset into Pyspark DataFrame") \
     .getOrCreate()
-pathToDataset = "customer_purchases_latest.csv"
+pathToDataset = "dataanalytics-assessment3/customer_purchases.csv"
 # Load the dataset into a PySpark DataFrame
 dataFrame = spark.read.csv(pathToDataset, header=True, inferSchema=True)
 # Show the first few rows of the DataFrame to verify the data has been loaded correctly

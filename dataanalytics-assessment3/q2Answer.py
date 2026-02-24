@@ -3,7 +3,6 @@ from pyspark.sql.functions import col, when, expr
 from pyspark.sql.functions import percentile_approx
 
 # Initialize Spark session
-pathToDataset = "dataanalytics-assessment3/customer_purchases.csv"
 spark = SparkSession.builder.appName("CustomerPurchases").getOrCreate()
 pathToDataset = "dataanalytics-assessment3/customer_purchases.csv"
 # Load CSV into first DataFrame

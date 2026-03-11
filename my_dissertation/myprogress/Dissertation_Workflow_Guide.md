@@ -11,8 +11,8 @@
 ### Week 1: March 1 - March 7
 
 #### Day 1-2: Administrative Setup
-- [ ] Submit ethics approval form to university
-- [ ] Create a dedicated folder structure for your dissertation:
+- [x] Submit ethics approval form to university
+- [x] Create a dedicated folder structure for your dissertation:
   ```
   dissertation/
   ├── 01_literature/
@@ -22,29 +22,29 @@
   ├── 05_writing/
   └── 06_scripts/
   ```
-- [ ] Set up a GitHub repository for your dissertation project
-- [ ] Install required tools:
+- [x] Set up a GitHub repository for your dissertation project
+- [x] Install required tools:
   - Python 3.x
   - VS Code or preferred IDE
   - Git
 
 #### Day 3-5: Literature Review - Reading
-- [ ] Read and take notes on these key papers:
+- [x] Read and take notes on these key papers:
   1. Gallaba et al. (2022) - "Accelerating Continuous Integration by Caching Environments"
   2. Bouzenia & Pradel (2024) - "Resource Usage and Optimization Opportunities in GitHub Actions"
   3. Gallaba & McIntosh (2020) - "Use and Misuse of Continuous Integration Features"
   4. Shahin et al. (2017) - "Continuous Integration, Delivery and Deployment: A Systematic Review"
   5. Rostami Mazrae et al. (2023) - "On the usage, co-usage and migration of CI/CD tools"
 
-- [ ] For each paper, note down:
+- [x] For each paper, note down:
   - Main findings
   - Methodology used
   - How it relates to your research
   - Gaps you can address
 
 #### Day 6-7: Literature Review - Writing
-- [ ] Write first draft of Literature Review chapter (aim for 1500-2000 words)
-- [ ] Organize by themes:
+- [x] Write first draft of Literature Review chapter (aim for 1500-2000 words)
+- [x] Organize by themes:
   - CI/CD overview and importance
   - GitHub Actions as a platform
   - Build optimization techniques (caching, parallelization)

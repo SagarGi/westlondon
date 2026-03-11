@@ -53,22 +53,22 @@
 ### Week 2: March 8 - March 10
 
 #### Day 8-9: Setup Development Environment
-- [ ] Create a GitHub Personal Access Token for API access:
+- [x] Create a GitHub Personal Access Token for API access:
   1. Go to GitHub → Settings → Developer Settings → Personal Access Tokens
   2. Generate new token with `repo` and `workflow` permissions
   3. Save token securely
 
-- [ ] Install Python libraries:
+- [x] Install Python libraries:
   ```bash
   pip install requests pandas matplotlib scipy seaborn pyyaml
   ```
 
-- [ ] Test GitHub API connection with a simple script
+- [x] Test GitHub API connection with a simple script
 
 #### Day 10: Finalize Phase 1
-- [ ] Review and refine literature review draft
-- [ ] Prepare repository selection criteria document
-- [ ] Create a tracking spreadsheet for your progress
+- [x] Review and refine literature review draft
+- [x] Prepare repository selection criteria document
+- [x] Create a tracking spreadsheet for your progress
 
 ---
 

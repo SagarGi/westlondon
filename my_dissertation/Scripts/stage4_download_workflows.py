@@ -1,17 +1,9 @@
-"""
-Stage 4 Prep: Download workflow files from your forks
-Run: python stage4_download_workflows.py
-"""
-
 import os
 from github import Github, Auth
 
-GITHUB_TOKEN = "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"
-
-# Your fork username
+GITHUB_TOKEN = "YOUR_TOKEN_HERE"
 FORK_USER = "SagarGi"
 
-# Repos and their key workflow files to optimize
 REPOS = {
     "stripe/stripe-python": ["ci.yml"],
     "django/djangoproject.com": ["tests.yml"],
@@ -27,14 +19,11 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     for repo_name, wf_files in REPOS.items():
-        # Try fork first, fall back to original
         fork_name = f"{FORK_USER}/{repo_name.split('/')[1]}"
         try:
             repo = g.get_repo(fork_name)
-            print(f"\nUsing fork: {fork_name}")
         except Exception:
             repo = g.get_repo(repo_name)
-            print(f"\nFork not found, using original: {repo_name}")
 
         for wf_name in wf_files:
             try:
@@ -46,9 +35,9 @@ def main():
                 with open(filepath, "w") as f:
                     f.write(text)
 
-                print(f"  Downloaded: {wf_name} ({len(text)} chars)")
+                print(f"Downloaded: {wf_name} ({len(text)} chars)")
             except Exception as e:
-                print(f"  Error downloading {wf_name}: {e}")
+                print(f"Error downloading {wf_name}: {e}")
 
     print(f"\nAll files saved to: {output_dir}/")
 

@@ -1,20 +1,13 @@
-"""
-Collect Post-Optimization Data from sparrowwallet/sparrow
-Run: python stage5_collect_sparrow.py
-"""
-
 import csv
 from github import Github, Auth
 
-GITHUB_TOKEN = ""
+GITHUB_TOKEN = "YOUR_TOKEN_HERE"
 FORK_REPO = "SagarGi/sparrow"
 
 def main():
     auth = Auth.Token(GITHUB_TOKEN)
     g = Github(auth=auth)
     repo = g.get_repo(FORK_REPO)
-
-    print(f"Collecting data from: {FORK_REPO}\n")
 
     all_runs = []
     for run in repo.get_workflow_runs(status="completed"):
@@ -38,11 +31,8 @@ def main():
 
     all_runs.sort(key=lambda x: x["created_at"])
 
-    print(f"Found {len(all_runs)} successful runs:\n")
-    print(f"{'#':<4} {'Run':<8} {'Duration(s)':<14} {'Created':<22} {'Commit Message'}")
-    print("-" * 100)
     for i, r in enumerate(all_runs, 1):
-        print(f"{i:<4} {r['run_number']:<8} {r['total_duration_seconds']:<14} {r['created_at']:<22} {r['commit_message'][:50]}")
+        print(f"{i}. Run {r['run_number']}: {r['total_duration_seconds']}s - {r['commit_message'][:50]}")
 
     output_file = "stage5_sparrow_post_optimization.csv"
     if all_runs:

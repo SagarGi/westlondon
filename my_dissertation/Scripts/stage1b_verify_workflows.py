@@ -1,18 +1,9 @@
-"""
-Stage 1b: Verify Workflow Files for Selected Repos
-Downloads and analyses the actual CI workflow YAML files
-to confirm caching and parallelization can be applied.
-
-Run: python stage1b_verify_workflows.py
-"""
-
 import os
 import yaml
 from github import Github, Auth
 
-GITHUB_TOKEN = ""
+GITHUB_TOKEN = "YOUR_TOKEN_HERE"
 
-# Our 5 selected repos
 REPOS = [
     "stripe/stripe-python",
     "django/djangoproject.com",
@@ -22,7 +13,6 @@ REPOS = [
 ]
 
 def analyse_workflow(content, filename):
-    """Analyse a workflow YAML file for caching and parallelization opportunities"""
     try:
         wf = yaml.safe_load(content)
     except Exception as e:
@@ -56,11 +46,9 @@ def analyse_workflow(content, filename):
             "installs_deps": False,
         }
 
-        # Check needs (sequential dependencies)
         if job_info["needs"]:
             analysis["has_sequential_deps"] = True
 
-        # Check matrix
         if job_info["has_matrix"]:
             analysis["has_matrix"] = True
 
@@ -73,8 +61,7 @@ def analyse_workflow(content, filename):
             uses = step.get("uses", "")
             run = step.get("run", "")
 
-            # Check for caching
-            if "actions/cache" in uses or "actions/setup-python" in uses and "cache" in str(step):
+            if "actions/cache" in uses:
                 job_info["uses_cache"] = True
                 analysis["has_caching"] = True
 
@@ -82,7 +69,6 @@ def analyse_workflow(content, filename):
                 job_info["uses_cache"] = True
                 analysis["has_caching"] = True
 
-            # Check for dependency installation (opportunity to add caching)
             dep_keywords = ["pip install", "npm install", "npm ci", "yarn install",
                           "mvn ", "gradle ", "maven", "composer install",
                           "bundle install", "go mod download"]
@@ -98,21 +84,19 @@ def analyse_workflow(content, filename):
 
         analysis["jobs"][job_name] = job_info
 
-    # Check for parallelization opportunities
     if analysis["has_sequential_deps"]:
         for job_name, job_info in analysis["jobs"].items():
             needs = job_info["needs"]
             if needs:
                 needs_list = needs if isinstance(needs, list) else [needs]
                 analysis["parallelization_opportunities"].append(
-                    f"Job '{job_name}' depends on {needs_list} - check if this can run in parallel"
+                    f"Job '{job_name}' depends on {needs_list}"
                 )
 
-    # Check if jobs WITHOUT matrix could benefit from matrix builds
     if not analysis["has_matrix"]:
         for job_name, job_info in analysis["jobs"].items():
             analysis["parallelization_opportunities"].append(
-                f"Job '{job_name}' has no matrix strategy - could test across multiple versions/OS"
+                f"Job '{job_name}' has no matrix strategy"
             )
 
     return analysis
@@ -126,17 +110,14 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     for repo_name in REPOS:
-        print(f"\n{'='*70}")
-        print(f"  REPO: {repo_name}")
-        print(f"{'='*70}")
+        print(f"\nREPO: {repo_name}")
 
         repo = g.get_repo(repo_name)
 
-        # Get workflow files
         try:
             workflow_files = repo.get_contents(".github/workflows")
         except Exception as e:
-            print(f"  ERROR: Could not access workflows: {e}")
+            print(f"  Could not access workflows: {e}")
             continue
 
         yml_files = [f for f in workflow_files if f.name.endswith(('.yml', '.yaml'))]
@@ -144,17 +125,15 @@ def main():
         for wf_file in yml_files:
             content = wf_file.decoded_content.decode('utf-8')
 
-            # Save the raw YAML
             safe_name = repo_name.replace("/", "_")
             filepath = os.path.join(output_dir, f"{safe_name}_{wf_file.name}")
             with open(filepath, "w") as f:
                 f.write(content)
 
-            # Analyse it
             analysis = analyse_workflow(content, wf_file.name)
 
             if "error" in analysis:
-                print(f"\n  [{wf_file.name}] Error: {analysis['error']}")
+                print(f"  [{wf_file.name}] Error: {analysis['error']}")
                 continue
 
             print(f"\n  [{wf_file.name}]")
@@ -163,7 +142,6 @@ def main():
             print(f"    Has matrix: {'YES' if analysis['has_matrix'] else 'NO'}")
             print(f"    Has sequential deps: {'YES' if analysis['has_sequential_deps'] else 'NO'}")
 
-            # Print job details
             for job_name, job_info in analysis["jobs"].items():
                 needs_str = f" (needs: {job_info['needs']})" if job_info['needs'] else ""
                 matrix_str = " [MATRIX]" if job_info['has_matrix'] else ""
@@ -171,23 +149,17 @@ def main():
                 deps_str = " [INSTALLS DEPS]" if job_info['installs_deps'] else ""
                 print(f"    - {job_name}{needs_str}{matrix_str}{cache_str}{deps_str}")
 
-            # Print opportunities
             if analysis["caching_opportunities"]:
-                print(f"\n    >> CACHING OPPORTUNITIES:")
+                print(f"    CACHING OPPORTUNITIES:")
                 for opp in analysis["caching_opportunities"]:
                     print(f"       - {opp}")
 
             if analysis["parallelization_opportunities"]:
-                print(f"\n    >> PARALLELIZATION OPPORTUNITIES:")
+                print(f"    PARALLELIZATION OPPORTUNITIES:")
                 for opp in analysis["parallelization_opportunities"]:
                     print(f"       - {opp}")
 
-        print()
-
-    print(f"\n{'='*70}")
-    print(f"All workflow YAML files saved to: {output_dir}/")
-    print(f"{'='*70}")
-    print("\nNext step: Upload this output back to Claude!")
+    print(f"\nAll workflow YAML files saved to: {output_dir}/")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,171 @@
+name: cart service ci
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "cart/**"
+      - ".github/workflows/actions/action.yaml"
+      - ".github/workflows/cart-ci.yaml"
+      - "pom.xml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "cart/**"
+      - ".github/workflows/actions/action.yaml"
+      - ".github/workflows/cart-ci.yaml"
+      - "pom.xml"
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    env:
+      FROM_ORIGINAL_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/workflows/actions
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-cart-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-cart-
+            ${{ runner.os }}-maven-
+      - name: Run Maven Build Command
+        run: mvn clean install -pl cart -am
+      - name: Test Results
+        uses: dorny/test-reporter@v1
+        if: ${{ env.FROM_ORIGINAL_REPOSITORY == 'true' && (success() || failure()) }}
+        with:
+          name: Cart-Service-Unit-Test-Results
+          path: "cart/**/*-reports/TEST*.xml"
+          reporter: java-junit
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cart-build
+          path: cart/target/
+          retention-days: 1
+
+  checkstyle:
+    name: Checkstyle Analysis
+    runs-on: ubuntu-latest
+    env:
+      FROM_ORIGINAL_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/workflows/actions
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-cart-checkstyle-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-cart-
+            ${{ runner.os }}-maven-
+      - name: Run Maven Checkstyle
+        if: ${{ env.FROM_ORIGINAL_REPOSITORY == 'true' }}
+        run: mvn checkstyle:checkstyle -pl cart -am -Dcheckstyle.output.file=cart-checkstyle-result.xml
+      - name: Upload Checkstyle Result
+        if: ${{ env.FROM_ORIGINAL_REPOSITORY == 'true' }}
+        uses: jwgmeligmeyling/checkstyle-github-action@master
+        with:
+          path: "**/cart-checkstyle-result.xml"
+
+  security-scan:
+    name: Security & Quality
+    runs-on: ubuntu-latest
+    env:
+      FROM_ORIGINAL_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/workflows/actions
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-cart-security-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-cart-
+            ${{ runner.os }}-maven-
+      - name: Run Maven Build
+        run: mvn clean install -pl cart -am -DskipTests
+      - name: Analyze with sonar cloud
+        continue-on-error: true
+        if: ${{ env.FROM_ORIGINAL_REPOSITORY == 'true' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -pl cart -am
+      - name: OWASP Dependency Check
+        if: ${{ env.FROM_ORIGINAL_REPOSITORY == 'true' }}
+        uses: dependency-check/Dependency-Check_Action@main
+        env:
+          JAVA_HOME: /opt/jdk
+        with:
+          project: "yas"
+          path: "."
+          format: "HTML"
+      - name: Upload OWASP Dependency Check results
+        if: ${{ env.FROM_ORIGINAL_REPOSITORY == 'true' }}
+        uses: actions/upload-artifact@master
+        with:
+          name: OWASP Dependency Check Report
+          path: ${{github.workspace}}/reports
+
+  coverage:
+    name: Coverage Report
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cart-build
+          path: cart/target/
+      - name: Add coverage report to PR
+        uses: madrapps/jacoco-report@v1.6.1
+        with:
+          paths: ${{github.workspace}}/cart/target/site/jacoco/jacoco.xml
+          token: ${{secrets.GITHUB_TOKEN}}
+          min-coverage-overall: 80
+          min-coverage-changed-files: 60
+          title: "Cart Coverage Report"
+          update-comment: true
+
+  docker:
+    name: Docker Build & Push
+    needs: [build-and-test]
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cart-build
+          path: cart/target/
+      - name: Log in to the Container registry
+        continue-on-error: true
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker images
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: ./cart
+          push: true
+          tags: ghcr.io/nashtech-garage/yas-cart:latest

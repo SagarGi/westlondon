@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - master
+      - beta
+      - sdk-release/**
+      - feature/**
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+*
+  pull_request:
+    branches:
+      - master
+      - beta
+      - private-preview
+      - sdk-release/**
+      - feature/**
+
+permissions: {}
+
+jobs:
+  lint:
+    name: Static Checks
+    runs-on: "ubuntu-24.04"
+    permissions:
+      contents: read
+    steps:
+      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v3
+      - name: Set up Python 3
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: check examples w/ mypy (against python@3.10)
+        run: just typecheck-examples
+      - name: check linting
+        run: just --no-deps lint
+      - name: check formatting
+        run: just --no-deps format-check
+      - name: check types (all Python versions)
+        run: |
+          set -eox
+          for minor in {6..12}; do
+            just --no-deps typecheck $minor
+          done
+
+  build:
+    name: Build
+    runs-on: "ubuntu-24.04"
+    permissions:
+      contents: read
+    steps:
+      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v3
+      - name: Set up Python 3
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Build and check package
+        run: |
+          just build
+      - name: "Upload Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  test:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version:
+          - "3.9"
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.14"
+          - "pypy-3.9"
+          - "pypy-3.10"
+          - "pypy-3.11"
+    name: Test (${{ matrix.python_version }})
+    steps:
+      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python_version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python_version }}
+      - uses: stripe/openapi/actions/stripe-mock@master
+      - name: "run tests"
+        run: just test
+
+  # Split typecheck into a separate parallel job instead of running inside lint
+  typecheck:
+    name: Type Check
+    runs-on: "ubuntu-24.04"
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python_minor: ["6", "7", "8", "9", "10", "11", "12"]
+    steps:
+      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v3
+      - name: Set up Python 3
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: just typecheck-examples
+      - name: Type check Python 3.${{ matrix.python_minor }}
+        run: just --no-deps typecheck ${{ matrix.python_minor }}
+
+  publish:
+    name: Publish
+    if: >-
+      ((github.event_name == 'workflow_dispatch') || (github.event_name == 'push')) &&
+      startsWith(github.ref, 'refs/tags/v')
+    needs: [build, test, lint, typecheck]
+    runs-on: "ubuntu-24.04"
+    permissions:
+      contents: read
+    steps:
+      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v3
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Set up Python 3
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install tools
+        run: just install-build-deps
+      - name: Publish packages to PyPI
+        run: |
+          set -ex
+          source .venv/bin/activate
+          python -m twine upload --verbose dist/*
+        env:
+          TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
+      - uses: stripe/openapi/actions/notify-release@master
+        if: always()
+        with:
+          bot_token: ${{ secrets.SLACK_BOT_TOKEN }}
